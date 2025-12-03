@@ -1,0 +1,60 @@
+body {
+    background: #f2f9f1;
+    font-family: Arial;
+    display: flex;
+    justify-content: center;
+    margin-top: 70px;
+}
+
+.login-container {
+    background: white;
+    padding: 30px;
+    width: 350px;
+    border-radius: 12px;
+    box-shadow: 0px 4px 12px rgba(0,0,0,0.2);
+    text-align: center;
+}
+
+.login-container input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    background: green;
+    color: white;
+    font-size: 16px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.divider {
+    margin: 15px 0;
+    font-size: 14px;
+    color: #888;
+}
+
+.google-btn {
+    background: #4285F4;
+}
+.signup-text {
+    margin-top: 15px;
+    font-size: 14px;
+    text-align: center;
+}
+
+.signup-link {
+    color: #0a7cff;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.signup-link:hover {
+    text-decoration: underline;
+}

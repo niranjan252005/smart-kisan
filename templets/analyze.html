@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Kisan – Analysis Report</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f4f7f9;
+            font-family: "Segoe UI", Arial;
+        }
+
+        .page-wrapper {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        h2 {
+            text-align: center;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 25px;
+        }
+
+        .image-box {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .image-box img {
+            width: 280px;
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        }
+
+        .card {
+            background: white;
+            padding: 22px;
+            border-radius: 14px;
+            margin-top: 22px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border-left: 6px solid #2e7d32;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .remedy-item {
+            background: #e8f5e9;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 8px;
+            border-left: 4px solid #43a047;
+            white-space: pre-line;
+        }
+
+        #chartContainer {
+            width: 260px;
+            height: 260px;
+            margin: 35px auto;
+        }
+
+        .download-btn {
+            display: block;
+            width: 220px;
+            margin: 30px auto;
+            padding: 12px 20px;
+            background: #2e7d32;
+            color: white;
+            text-align: center;
+            font-size: 17px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        }
+
+        .download-btn:hover {
+            background: #1b5e20;
+        }
+
+        /* ------------ LOADER ------------ */
+        .loader-box {
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .loader {
+            border: 6px solid #e0e0e0;
+            border-top: 6px solid #2e7d32;
+            border-radius: 50%;
+            width: 55px;
+            height: 55px;
+            animation: spin 0.9s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<div class="page-wrapper">
+
+    <h2>🌿 Smart Kisan – Disease Analysis Report</h2>
+
+    <div class="image-box">
+        <img id="previewImage">
+    </div>
+
+    <!-- LOADER -->
+    <div id="loader" class="loader-box">
+        <div class="loader"></div>
+        <p>Analyzing image... please wait</p>
+    </div>
+
+    <div id="result" style="display:none;"></div>
+
+    <div id="chartContainer" style="display:none;">
+        <canvas id="healthChart"></canvas>
+    </div>
+
+    <div class="download-btn" onclick="downloadPDF()" style="display:none;" id="downloadBtn">
+        ⬇️ Download PDF Report
+    </div>
+
+</div>
+
+<script>
+window.onload = function () {
+    let base64Image = sessionStorage.getItem("uploadedImage");
+
+    if (!base64Image) {
+        document.getElementById("result").innerHTML =
+            "<p style='color:red;'>❌ No image found. Please upload again.</p>";
+        return;
+    }
+
+    document.getElementById("previewImage").src = base64Image;
+
+    fetch(base64Image)
+        .then(res => res.blob())
+        .then(blob => {
+            let file = new File([blob], "upload.png", { type: "image/png" });
+            analyze(file);
+        });
+};
+
+async function analyze(file) {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const response = await fetch("/api/predict", {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await response.json();
+
+    // Hide Loader
+    document.getElementById("loader").style.display = "none";
+
+    // If error
+    if (data.error) {
+        document.getElementById("result").innerHTML =
+            "<p style='color:red;'>❌ " + data.error + "</p>";
+        return;
+    }
+
+    // Show result
+    document.getElementById("result").style.display = "block";
+    document.getElementById("chartContainer").style.display = "block";
+    document.getElementById("downloadBtn").style.display = "block";
+
+    // ---------- RESULT CARDS ----------
+    document.getElementById("result").innerHTML = `
+        <div class="card">
+            <div class="card-title">🩺 Disease Summary</div>
+            <p><b>Disease:</b> ${data.disease}</p>
+            <p><b>Confidence:</b> ${data.confidence}%</p>
+            <p><b>Severity:</b> ${data.severity}</p>
+            <p><b>Health Score:</b> ${data.health_score}%</p>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📘 Expert Explanation (AI)</div>
+            <div class="remedy-item">${data.explanation}</div>
+        </div>
+    `;
+
+    // ---------- CHART ----------
+    new Chart(document.getElementById("healthChart"), {
+        type: "doughnut",
+        data: {
+            labels: ["Healthy", "Disease"],
+            datasets: [{
+                data: [data.health_score, 100 - data.health_score],
+                backgroundColor: ["#2e7d32", "#c62828"]
+            }]
+        },
+        options: {
+            cutout: "65%",
+            plugins: { legend: { display: true } }
+        }
+    });
+
+    window.reportData = data;
+}
+
+function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF();
+
+    pdf.setFontSize(18);
+    pdf.text("Smart Kisan – Disease Analysis Report", 10, 15);
+
+    pdf.setFontSize(12);
+    let y = 30;
+
+    const d = window.reportData;
+
+    pdf.text(`Disease: ${d.disease}`, 10, y); y += 10;
+    pdf.text(`Confidence: ${d.confidence}%`, 10, y); y += 10;
+    pdf.text(`Severity: ${d.severity}`, 10, y); y += 10;
+    pdf.text(`Health Score: ${d.health_score}%`, 10, y); y += 12;
+
+    pdf.text("Explanation:", 10, y); y += 8;
+    pdf.text(d.explanation, 10, y, { maxWidth: 180 });
+
+    pdf.save("SmartKisan_Report.pdf");
+}
+</script>
+
+</body>
+</html>

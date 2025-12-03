@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Kisan - Signup</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="login-container">
+    <h2>Create Account</h2>
+
+    <input type="text" id="name" placeholder="Full Name">
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+
+    <button onclick="signup()">Signup</button>
+
+    <div class="divider">OR</div>
+
+    <button class="google-btn" onclick="googleSignup()">
+        Signup with Google
+    </button>
+
+    <p class="switch">
+        Already have an account?
+        <a href="/">Login</a>
+    </p>
+</div>
+
+<script src="{{ url_for('static', filename='js/signup.js') }}"></script>
+
+</body>
+</html>

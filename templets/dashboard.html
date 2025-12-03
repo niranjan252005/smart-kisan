@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Smart Kisan Dashboard</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --primary:#4285F4;
+      --muted:#67707a;
+      --card-bg:#fff;
+      --shadow: 0 8px 24px rgba(15,23,42,0.06);
+    }
+    body{ margin:0; padding:0; font-family:"Inter",sans-serif; background:#f4f6f9; color:#0f172a; -webkit-font-smoothing:antialiased; }
+
+    /* NAVBAR */
+    .navbar{ background:var(--primary); padding:14px 20px; color:white; display:flex; justify-content:space-between; align-items:center; font-size:20px; font-weight:700; gap:12px; }
+    .nav-title { display:flex; align-items:center; gap:12px; }
+    .nav-actions{ display:flex; align-items:center; gap:12px; }
+    .icon-btn{ background:none; border:none; font-size:20px; cursor:pointer; color:white; padding:8px; border-radius:8px; }
+    .icon-btn:focus{ outline:2px solid rgba(255,255,255,0.18); }
+
+    /* MORE MENU (sidebar) */
+    .more-menu{ position:fixed; top:0; right:-340px; width:320px; height:100%; background:#fff; padding:18px; box-shadow:-8px 0 30px rgba(2,6,23,0.12); transition:0.28s ease; z-index:1400; }
+    .more-menu .title { font-weight:700; margin-bottom:8px; color:#111827; }
+    .more-menu button{ width:100%; padding:12px; background:var(--primary); color:#fff; border:none; border-radius:8px; margin-top:8px; cursor:pointer; }
+
+    /* SEARCH */
+    .search-container{ padding:18px 24px; display:flex; justify-content:center; align-items:center; gap:12px; }
+    .search-wrapper{ position:relative; width:60%; max-width:980px; }
+    .search-icon{ position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:18px; pointer-events:none; }
+    .search-input{ width:90%; padding:12px 14px 12px 44px; font-size:15px; border-radius:10px; border:1px solid #e6eef6; background:#fff; box-shadow:0 6px 18px rgba(2,6,23,0.03); }
+    .action-buttons { display:flex; gap:10px; margin-left:8px; }
+    .capture-btn,.upload-btn{ padding:10px 14px; border:none; border-radius:10px; font-weight:600; color:#fff; cursor:pointer; box-shadow:0 6px 18px rgba(2,6,23,0.04); }
+    .capture-btn{ background:#34A853; }
+    .upload-btn{ background:#EA4335; }
+
+    /* GRID */
+    .grid{ padding:24px; display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:20px; }
+
+    .card{ background:var(--card-bg); padding:16px; border-radius:12px; box-shadow:var(--shadow); min-height:160px; position:relative; }
+    .card h2{ font-size:18px; margin:0 0 10px 0; color:#111827; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+
+    /* per-card three-dot more button + small popover */
+    .card .card-actions { position:absolute; top:12px; right:12px; }
+    .card .moreCardBtn{ background:none; border:none; font-size:18px; cursor:pointer; padding:6px; border-radius:6px; }
+    .card .popover{ display:none; position:absolute; top:36px; right:6px; background:#fff; border-radius:8px; box-shadow:0 8px 24px rgba(2,6,23,0.12); padding:8px; z-index:1200; width:220px; }
+    .card .popover button{ width:100%; text-align:left; padding:8px; border:none; background:none; cursor:pointer; border-radius:6px; }
+    .card .popover button:hover{ background:#f1f5f9; }
+
+    /* make market card full width in grid by spanning all columns */
+    #marketCard { grid-column: 1 / -1; min-height: 260px; }
+
+    /* notifications panel */
+    .notifications-panel{ position:fixed; top:0; right:-420px; width:380px; height:100%; background:#fff; padding:18px; box-shadow:-8px 0 30px rgba(2,6,23,0.12); transition:0.28s; z-index:1300; }
+    .notifications-panel .close { float:right; font-size:18px; border:none; background:none; cursor:pointer; }
+
+    /* loader overlay */
+    #globalLoader{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(2,6,23,0.2); z-index:2000; visibility:hidden; opacity:0; transition:0.18s; }
+    #globalLoader.show{ visibility:visible; opacity:1; }
+    .loader { width:86px; height:86px; border-radius:12px; background:#fff; box-shadow:0 12px 36px rgba(2,6,23,0.2); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+    .spinner{ width:42px; height:42px; border:5px solid #e6eef6; border-top:5px solid var(--primary); border-radius:50%; animation:spin .9s linear infinite; }
+    @keyframes spin{ to{ transform:rotate(360deg); } }
+
+    .muted{ color:var(--muted); font-size:13px; }
+
+    @media (max-width:640px){
+      .search-wrapper{ width:92%; }
+      .nav-title{ font-size:16px; }
+      #marketCard { grid-column: 1 / -1; }
+    }
+
+    /* small per-card loader */
+    .card .small-loader { display:none; position:absolute; left:12px; bottom:12px; font-size:13px; color:var(--muted); }
+    .card.loading .small-loader { display:block; }
+  </style>
+</head>
+<body>
+
+  <div class="navbar">
+    <div class="nav-title">Smart Kisan Dashboard</div>
+    <div class="nav-actions" role="toolbar" aria-label="top actions">
+      <button id="notifyBtn" class="icon-btn" title="Notifications">🔔</button>
+      <button id="moreBtn" class="icon-btn more-btn" title="More menu">⋮</button>
+    </div>
+  </div>
+
+  <!-- More menu -->
+  <div id="moreMenu" class="more-menu" aria-hidden="true">
+    <div class="title">Menu</div>
+    <button id="closeMore">✖ Close</button>
+    <button id="historyBtn">📜 History</button>
+    <button id="logoutBtn">🚪 Logout</button>
+  </div>
+
+  <!-- Search area -->
+  <div class="search-container">
+    <div class="search-wrapper">
+      <span class="search-icon">🔍</span>
+      <input id="searchInput" type="text" class="search-input" placeholder="Search crops, soil, schemes, market items..." aria-label="search">
+    </div>
+
+    <div class="action-buttons">
+      <button id="cameraBtn" class="capture-btn">📷 Capture</button>
+      <button id="uploadBtn" class="upload-btn">⬆ Upload</button>
+      <input id="fileUpload" type="file" accept="image/*" style="display:none">
+    </div>
+  </div>
+
+  <!-- Global loader -->
+  <div id="globalLoader" aria-hidden="true">
+    <div class="loader" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="muted">Loading dashboard…</div>
+    </div>
+  </div>
+
+  <!-- main cards -->
+  <div class="grid" id="mainGrid">
+    <div class="card" id="weatherCard">
+      <h2>
+        Weather Today
+        <div class="card-actions">
+          <button class="moreCardBtn" data-card="weather">⋯</button>
+          <div class="popover" data-popover="weather">
+            <button class="popover-action" data-action="refresh-weather">🔄 Refresh</button>
+            <button class="popover-action" data-action="forecast">📅 7-day Forecast</button>
+            <button class="popover-action" data-action="ask-ai" data-query="Give me current weather advice for farmers in my area">🤖 Ask AI</button>
+          </div>
+        </div>
+      </h2>
+      <p><b>Location:</b> <span id="weatherLocation">--</span></p>
+      <p><b>Temperature:</b> <span id="temp">--</span></p>
+      <p><b>Humidity:</b> <span id="humidity">--</span></p>
+      <p><b>Wind:</b> <span id="wind">--</span></p>
+      <div class="small-loader">Updating…</div>
+    </div>
+
+    <div class="card" id="cropCard">
+      <h2>
+        Crop Recommendations
+        <div class="card-actions">
+          <button class="moreCardBtn" data-card="crops">⋯</button>
+          <div class="popover" data-popover="crops">
+            <button class="popover-action" data-action="refresh-crops">🔄 Refresh</button>
+            <button class="popover-action" data-action="ask-ai" data-query="Which crops suit smallholders in semi-arid regions?">🤖 Ask AI</button>
+          </div>
+        </div>
+      </h2>
+      <ul id="crop-list"></ul>
+      <div class="small-loader">Updating…</div>
+    </div>
+
+    <div class="card" id="soilCard">
+      <h2>
+        Soil Health
+        <div class="card-actions">
+          <button class="moreCardBtn" data-card="soil">⋯</button>
+          <div class="popover" data-popover="soil">
+            <button class="popover-action" data-action="refresh-soil">🔄 Refresh</button>
+            <button class="popover-action" data-action="details">📋 Details</button>
+          </div>
+        </div>
+      </h2>
+      <p><b>N:</b> <span id="soilN">--</span></p>
+      <p><b>P:</b> <span id="soilP">--</span></p>
+      <p><b>K:</b> <span id="soilK">--</span></p>
+      <div class="small-loader">Updating…</div>
+    </div>
+
+    <div class="card" id="schemes-card">
+      <h2>
+        Government Schemes
+        <div class="card-actions">
+          <button class="moreCardBtn" data-card="schemes">⋯</button>
+          <div class="popover" data-popover="schemes">
+            <button class="popover-action" data-action="refresh-schemes">🔄 Refresh</button>
+            <!-- Ask AI will call /api/ai_query with type: "schemes" -->
+            <button class="popover-action" data-action="ask-ai" data-query="List relevant government agricultural schemes for small farmers in India, brief bullets">🤖 Ask AI</button>
+          </div>
+        </div>
+      </h2>
+      <ul id="schemes-list"></ul>
+      <div class="small-loader">Updating…</div>
+    </div>
+
+    <div class="card" id="marketCard">
+      <h2>
+        Live Market Prices
+        <div class="card-actions">
+          <button class="moreCardBtn" data-card="market">⋯</button>
+          <div class="popover" data-popover="market">
+            <button class="popover-action" data-action="refresh-market">🔄 Refresh</button>
+            <!-- Ask AI will call /api/ai_query with type: "market" -->
+            <button class="popover-action" data-action="ask-ai" data-query="Give latest market price trends for staple crops in INR and short advice for sellers">🤖 Ask AI</button>
+          </div>
+        </div>
+      </h2>
+      <ul id="market-list"></ul>
+      <div class="small-loader">Updating…</div>
+    </div>
+  </div>
+
+  <!-- graphs -->
+  <div class="grid">
+    <div class="card"><h2>NPK Graph</h2><canvas id="soilGraph"></canvas></div>
+    <div class="card"><h2>Temperature Graph</h2><canvas id="weatherGraph"></canvas></div>
+    <div class="card"><h2>Market Graph</h2><canvas id="marketGraph"></canvas></div>
+  </div>
+
+  <!-- notifications panel -->
+  <div id="notifications" class="notifications-panel" aria-hidden="true">
+    <button class="close" id="closeNotif">✖</button>
+    <h2>Notifications</h2>
+    <div id="notif-list"></div>
+  </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const moreMenu = document.getElementById("moreMenu");
+  const moreBtn = document.getElementById("moreBtn");
+  const closeMore = document.getElementById("closeMore");
+  const notifyBtn = document.getElementById("notifyBtn");
+  const notifications = document.getElementById("notifications");
+  const closeNotif = document.getElementById("closeNotif");
+  const fileUpload = document.getElementById("fileUpload");
+  const uploadBtn = document.getElementById("uploadBtn");
+  const historyBtn = document.getElementById("historyBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const cameraBtn = document.getElementById("cameraBtn");
+  const searchInput = document.getElementById("searchInput");
+  const globalLoader = document.getElementById("globalLoader");
+
+  // helper to show global loader
+  function showLoader(show=true){
+    if(show) globalLoader.classList.add("show");
+    else globalLoader.classList.remove("show");
+  }
+
+  // menu toggles
+  function toggleMoreMenu(){ const open = moreMenu.style.right === "0px"; moreMenu.style.right = open ? "-340px" : "0px"; moreMenu.setAttribute("aria-hidden", String(open)); }
+  moreBtn.addEventListener("click", toggleMoreMenu);
+  closeMore.addEventListener("click", toggleMoreMenu);
+
+  function toggleNotifications(){ const open = notifications.style.right === "0px"; notifications.style.right = open ? "-420px" : "0px"; notifications.setAttribute("aria-hidden", String(open)); }
+  notifyBtn.addEventListener("click", toggleNotifications);
+  closeNotif.addEventListener("click", toggleNotifications);
+
+  historyBtn.addEventListener("click", ()=> window.location.href="/history");
+  logoutBtn.addEventListener("click", ()=> {
+    if(confirm("Logout?")) { try { sessionStorage.clear(); localStorage.removeItem("authToken"); } catch(e){} window.location.href="/"; }
+  });
+
+  uploadBtn.addEventListener("click", ()=> fileUpload.click());
+  fileUpload.addEventListener("change", (e)=> {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=> { sessionStorage.setItem("uploadedImage", ev.target.result); window.location.href="/analyze"; };
+    reader.readAsDataURL(file);
+  });
+
+  cameraBtn.addEventListener("click", ()=> { alert("Camera capture not implemented in this HTML — integrate getUserMedia or a camera page."); });
+
+  // per-card popovers
+  document.querySelectorAll(".moreCardBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      // close others
+      document.querySelectorAll(".popover").forEach(p=> p.style.display = "none");
+      const card = btn.dataset.card;
+      const pop = document.querySelector(`.popover[data-popover="${card}"]`);
+      if(pop) pop.style.display = (pop.style.display === "block") ? "none" : "block";
+    });
+  });
+
+  // handle popover actions (refresh / ask-ai / forecast / details)
+  document.querySelectorAll(".popover .popover-action").forEach(act=>{
+    act.addEventListener("click", async (ev)=>{
+      const action = act.dataset.action;
+      const query = act.dataset.query || "";
+      const pop = act.closest(".popover");
+      if(pop) pop.style.display = "none";
+
+      if(action.startsWith("refresh")){
+        await loadDashboard(); // refresh all for simplicity
+      } else if(action === "ask-ai"){
+        // Call your backend AI route: POST /api/ai_query { type: "schemes"|"market"|"custom", prompt:"..." }
+        // Server should use OpenAI with your server-side API key and return { ok:true, text:"..." }
+        try {
+          showLoader(true);
+          const body = { type: (act.closest(".popover").dataset.popover === "schemes" ? "schemes" : (act.closest(".popover").dataset.popover === "market" ? "market" : "custom")), prompt: query };
+          const res = await fetch("/api/ai_query", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+          const json = await res.json();
+          if(json && json.ok && json.text){
+            // Show result in an alert (or better: modal). Keep simple:
+            alert("AI answer:\n\n" + json.text);
+            // Optionally populate the corresponding card with the AI text
+            const target = act.closest(".popover").dataset.popover;
+            if(target === "schemes"){
+              // convert paragraphs to list items
+              document.getElementById("schemes-list").innerHTML = json.text.split(/\n+/).map(s=>`<li>${s}</li>`).join("");
+            } else if(target === "market"){
+              document.getElementById("market-list").innerHTML = json.text.split(/\n+/).map(s=>`<li>${s}</li>`).join("");
+            }
+          } else {
+            alert("AI returned no useful answer.");
+          }
+        } catch(err){
+          console.warn("AI ask error:", err);
+          alert("AI service is not available. Implement /api/ai_query on backend.");
+        } finally { showLoader(false); }
+      } else if(action === "forecast"){
+        window.location.href = "/forecast";
+      } else if(action === "details"){
+        alert("Open soil details (not implemented)");
+      }
+    });
+  });
+
+  // close popovers when clicking outside
+  document.addEventListener("click", (e)=>{
+    if(!e.target.matches(".moreCardBtn")) {
+      document.querySelectorAll(".popover").forEach(p=>{
+        if(!p.contains(e.target)) p.style.display = "none";
+      });
+    }
+  });
+
+  // ESC closes UI overlays
+  document.addEventListener("keydown", (e)=> {
+    if(e.key === "Escape"){
+      moreMenu.style.right = "-340px";
+      notifications.style.right = "-420px";
+      document.querySelectorAll(".popover").forEach(p=> p.style.display = "none");
+    }
+  });
+
+  // SEARCH — client-side filter for lists
+  searchInput.addEventListener("input", (e)=> { const q = e.target.value.trim().toLowerCase(); filterLists(q); });
+  function filterLists(q){
+    document.querySelectorAll("#crop-list li").forEach(li=> { const t = li.textContent.toLowerCase(); li.style.display = q === "" || t.includes(q) ? "" : "none"; });
+    document.querySelectorAll("#schemes-list li").forEach(li=> { const t = li.textContent.toLowerCase(); li.style.display = q === "" || t.includes(q) ? "" : "none"; });
+    document.querySelectorAll("#market-list li").forEach(li=> { const t = li.textContent.toLowerCase(); li.style.display = q === "" || t.includes(q) ? "" : "none"; });
+  }
+
+  // DASHBOARD LOADING
+  async function loadDashboard(){
+    showLoader(true);
+    // add small "loading" class to cards while update happens
+    document.querySelectorAll(".card").forEach(c => c.classList.add("loading"));
+    try{
+      const [weatherRes, cropsRes, soilRes, marketRes, schemesRes, notifRes] = await Promise.all([
+        fetch("/api/weather"), fetch("/api/crops"), fetch("/api/soil"),
+        fetch("/api/market"), fetch("/api/schemes"), fetch("/api/notifications")
+      ]);
+
+      // parse responses safely
+      const weather = weatherRes.ok ? await weatherRes.json() : {};
+      const crops = cropsRes.ok ? await cropsRes.json() : [];
+      const soil = soilRes.ok ? await soilRes.json() : {N:"--",P:"--",K:"--"};
+      const market = marketRes.ok ? await marketRes.json() : [];
+      const schemes = schemesRes.ok ? await schemesRes.json() : [];
+      const notif = notifRes.ok ? await notifRes.json() : [];
+
+      // Weather & location (prefer backend city/location, else browser geolocation)
+      const locationEl = document.getElementById("weatherLocation");
+      if(weather.location) {
+        locationEl.innerText = weather.location;
+      } else {
+        try {
+          const pos = await new Promise((resolve, reject) => {
+            if(!navigator.geolocation) return reject();
+            navigator.geolocation.getCurrentPosition(resolve, reject, {timeout:5000});
+          });
+          locationEl.innerText = `${pos.coords.latitude.toFixed(3)}, ${pos.coords.longitude.toFixed(3)}`;
+        } catch(e) {
+          locationEl.innerText = weather.city || weather.region || "--";
+        }
+      }
+
+      document.getElementById("temp").innerText = (weather.temp ?? "--") + (weather.temp ? "°C" : "");
+      document.getElementById("humidity").innerText = (weather.humidity ?? "--") + (weather.humidity ? "%" : "");
+      document.getElementById("wind").innerText = weather.wind ?? "--";
+
+      document.getElementById("crop-list").innerHTML = (crops || []).map(c=>`<li>${c}</li>`).join("");
+      document.getElementById("soilN").innerText = soil.N ?? "--";
+      document.getElementById("soilP").innerText = soil.P ?? "--";
+      document.getElementById("soilK").innerText = soil.K ?? "--";
+
+      // Market and schemes are arrays of objects or text. If they are objects, map to list; else print as lines
+      function toListHtml(item){
+        if(!item) return "";
+        if(typeof item === "string") return `<li>${item}</li>`;
+        if(item.crop && item.price) return `<li>${item.crop}: ₹${item.price}</li>`;
+        // fallback: stringify
+        return `<li>${JSON.stringify(item)}</li>`;
+      }
+
+      document.getElementById("market-list").innerHTML = (market || []).map(m => toListHtml(m)).join("");
+      document.getElementById("schemes-list").innerHTML = (schemes || []).map(s => toListHtml(s)).join("");
+      document.getElementById("notif-list").innerHTML = (notif || []).map(n => `<p>${n}</p>`).join("");
+
+      // charts
+      try {
+        if(typeof Chart !== "undefined"){
+          drawSoilGraph(soil);
+          drawWeatherGraph(weather.temp ?? 0);
+          drawMarketGraph(market);
+        }
+      } catch(e){ console.warn("chart draw err", e); }
+    } catch(err){
+      console.warn("dashboard load error", err);
+      alert("Failed to load dashboard data. Check your backend APIs.");
+    } finally {
+      // remove loading class
+      document.querySelectorAll(".card").forEach(c => c.classList.remove("loading"));
+      showLoader(false);
+    }
+  }
+
+  function drawSoilGraph(soil){
+    try {
+      const el = document.getElementById("soilGraph"); if(!el) return;
+      new Chart(el, { type:"bar", data:{ labels:["N","P","K"], datasets:[{ data:[soil.N??0, soil.P??0, soil.K??0] }] } });
+    } catch(e){ console.warn(e); }
+  }
+  function drawWeatherGraph(temp){
+    try {
+      const el = document.getElementById("weatherGraph"); if(!el) return;
+      new Chart(el, { type:"line", data:{ labels:["Now"], datasets:[{ data:[temp??0] }] } });
+    } catch(e){ console.warn(e); }
+  }
+  function drawMarketGraph(market){
+    try {
+      const el = document.getElementById("marketGraph"); if(!el) return;
+      new Chart(el, { type:"bar", data:{ labels:(market||[]).map(m=>m.crop || m.name || ""), datasets:[{ data:(market||[]).map(m=>m.price || 0) }] } });
+    } catch(e){ console.warn(e); }
+  }
+
+  // initial load
+  loadDashboard();
+
+  // keep search enter from submitting anything
+  searchInput.addEventListener("keydown", (e)=> { if(e.key === "Enter") e.preventDefault(); });
+
+});
+
+document.querySelector(".search-input").addEventListener("input", function () {
+    let q = this.value.toLowerCase().trim();
+
+    if (q.length < 2) return;
+
+    fetch(`/api/search?q=${q}`)
+      .then(r => r.json())
+      .then(data => {
+          alert("Search Result:\n" + data.result);
+      });
+});
+
+</script>
+</body>
+</html>

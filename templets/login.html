@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Kisan - Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="login-container">
+    <h2>Smart Kisan Login</h2>
+
+    <input type="email" id="email" placeholder="Enter Email">
+    <input type="password" id="password" placeholder="Enter Password">
+
+    <button onclick="manualLogin()">Login</button>
+
+    <div class="divider">OR</div>
+
+    <button class="google-btn" onclick="googleLogin()">
+        Login with Google
+    </button>
+
+    <!-- Signup Section -->
+    <p class="signup-text">
+        Don't have an account?
+        <a href="/signup" class="signup-link">Sign Up</a>
+    </p>
+</div>
+
+<script src="{{ url_for('static', filename='js/login.js') }}"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+
+</body>
+</html>
